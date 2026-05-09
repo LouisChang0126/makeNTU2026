@@ -1,7 +1,8 @@
 import os
-import time
-from edge_impulse_linux.audio import AudioImpulseRunner
-import speech_recognition as sr
+import subprocess
+
+import numpy as np
+from edge_impulse_linux.runner import ImpulseRunner
 
 # 內部變數，紀錄自上次 getter 呼叫後的最高狀態值
 _current_max_status = 0
@@ -13,7 +14,7 @@ wordlist = ["沒事", "取消", "救命", "啊", "unknown"]
 current_dir = os.path.dirname(os.path.abspath(__file__))
 model_file = os.path.join(current_dir, "model.eim")
 
-# --- 修改後的 Getter 函數 ---
+
 def getter():
     """
     回傳自上次呼叫此函數以來偵測到的最大數值：
@@ -27,59 +28,84 @@ def getter():
     _current_max_status = 0  # 重置紀錄
     return ret
 
-# 2. 定義語音轉文字函數 (STT) - 保留結構
-def perform_stt():
-    recognizer = sr.Recognizer()
-    with sr.Microphone() as source:
-        print(">>> 偵測到喚醒詞！請說出您的指令...")
-        recognizer.adjust_for_ambient_noise(source, duration=1)
-        audio_data = recognizer.listen(source, timeout=5, phrase_time_limit=5)
-    
-    try:
-        text = recognizer.recognize_google(audio_data, language="zh-TW")
-        print(f">>> 您說的是: {text}")
-    except Exception as e:
-        print(f">>> 辨識失敗: {e}")
 
-# 3. 主循環：喚醒詞偵測 (Edge Impulse)
+# 主循環：喚醒詞偵測 (Edge Impulse + arecord)
 def main():
     global _current_max_status
-    
-    with AudioImpulseRunner(model_file) as runner:
-        model_info = runner.init()
-        print(f"模型已啟動，正在監聽喚醒詞...")
 
-        for res, audio in runner.classifier():
-            classifications = res['result']['classification']
-            best_score = 0.0
-            best_word = None
-            
-            for word in wordlist:
-                if word in classifications:
-                    score = classifications[word]
-                    if score > 0.8: # 信心值門檻
-                        if best_score < score:
-                            best_score = score
-                            best_word = word
-            
-            # 判斷本次偵測的分數
-            this_run_status = 0
-            if best_word in ["救命", "啊"]:
-                this_run_status = 1
-            elif best_word in ["沒事", "取消"]:
-                this_run_status = 2
-            
-            # 更新累計的最大值 (確保 2 > 1 > 0)
-            if this_run_status > _current_max_status:
-                _current_max_status = this_run_status
-            
-            # 輔助偵錯訊息
-            if best_word:
-                print(f"🎤 偵測到: [{best_word}] (狀態: {this_run_status}), 目前累計最大值: {_current_max_status}")
-            else:
-                print(f".", end="", flush=True) # 未偵測到時印點表示運行中
+    with ImpulseRunner(model_file) as runner:
+        model_info = runner.init()
+        params = model_info["model_parameters"]
+        sample_rate = int(params["frequency"])
+        window_size = int(params["input_features_count"])
+        # 與 AudioImpulseRunner.classifier() 行為一致：每次以 1/4 視窗滑動
+        slice_size = max(1, window_size // 4)
+        bytes_per_slice = slice_size * 2  # int16 = 2 bytes
+
+        print(f"模型已啟動，正在監聽喚醒詞 (sr={sample_rate}, window={window_size})...")
+
+        # 以 arecord 直接擷取原始 PCM (S16_LE, mono) 串流
+        cmd = [
+            "arecord",
+            "-q",
+            "-f", "S16_LE",
+            "-c", "1",
+            "-r", str(sample_rate),
+            "-t", "raw",
+        ]
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+
+        try:
+            while True:
+                raw = proc.stdout.read(bytes_per_slice)
+                if not raw or len(raw) < bytes_per_slice:
+                    break
+
+                samples = np.frombuffer(raw, dtype=np.int16).tolist()
+                res = runner.classify_continuous(samples)
+
+                classifications = res["result"]["classification"]
+                best_score = 0.0
+                best_word = None
+
+                for word in wordlist:
+                    if word in classifications:
+                        score = classifications[word]
+                        if score > 0.8:  # 信心值門檻
+                            if best_score < score:
+                                best_score = score
+                                best_word = word
+
+                # 判斷本次偵測的分數
+                this_run_status = 0
+                if best_word in ["救命", "啊"]:
+                    this_run_status = 1
+                elif best_word in ["沒事", "取消"]:
+                    this_run_status = 2
+
+                # 更新累計的最大值 (確保 2 > 1 > 0)
+                if this_run_status > _current_max_status:
+                    _current_max_status = this_run_status
+
+                # 輔助偵錯訊息
+                if best_word:
+                    print(
+                        f"🎤 偵測到: [{best_word}] (狀態: {this_run_status}), "
+                        f"目前累計最大值: {_current_max_status}"
+                    )
+                else:
+                    print(".", end="", flush=True)
+        finally:
+            proc.terminate()
+            try:
+                proc.wait(timeout=1.0)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+
 
 if __name__ == "__main__":
-    # 提醒：若要在其他地方呼叫 get_last_detection_status()，
-    # 建議使用多線程 (threading) 執行 main()
     main()

@@ -1,0 +1,4 @@
+numpy
+edge-impulse-linux
+six
+opencv-python>=4.5.1.48,<5

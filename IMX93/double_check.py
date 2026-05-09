@@ -5,7 +5,6 @@ cancel keyword (output==2). If no cancel arrives in CANCEL_WINDOW_S, posts
 to the GCF /event endpoint to trigger the LINE notification.
 """
 import json
-import platform
 import subprocess
 import time
 import urllib.request
@@ -28,11 +27,7 @@ def _play(path: Path) -> None:
     if not path.exists():
         print(f"[audio] missing file: {path}")
         return
-    if platform.system() == "Windows":
-        import winsound
-        winsound.PlaySound(str(path), winsound.SND_FILENAME)
-    else:
-        subprocess.run(["aplay", "-q", str(path)], check=False)
+    subprocess.run(["aplay", "-q", str(path)], check=False)
 
 
 def _post_event(event_type: str) -> None:
