@@ -1,13 +1,21 @@
-"""HTTP wrapper that exposes wake_up.getter() over the LAN.
+"""HTTP wrapper that exposes wake_up.getter() and audio playback over the LAN.
 
-Runs on the Ubuntu PC that owns the microphone. The IMX93 polls
-GET /wake_status during double_check.confirm() to look for the
-cancel keyword.
+Runs on the Ubuntu PC that owns both the microphone and the speaker.
+The IMX93 polls GET /wake_status during double_check.confirm() to look for
+the cancel keyword, and POSTs /play to drive prompt/alerted/cancelled
+audio.
 
 Endpoints
-    GET /wake_status   -> {"status": 0|1|2}    drain-and-reset
-    GET /wake_peek     -> {"status": 0|1|2}    read-only (debug/dashboard)
-    GET /healthz       -> {"ok": true}
+    GET  /wake_status   -> {"status": 0|1|2}    drain-and-reset
+    GET  /wake_peek     -> {"status": 0|1|2}    read-only (debug/dashboard)
+    GET  /healthz       -> {"ok": true}
+    POST /play          body {"name": "prompt"|"alerted"|"cancelled"}
+                        -> {"played": bool, "name": str}
+                        Blocks until aplay finishes so callers can chain
+                        prompt → wait-for-cancel → cancelled/alerted.
+
+Env
+    APLAY_DEVICE        Optional aplay -D device, e.g. plughw:CARD=Device
 
 Usage
     cd IMX93
@@ -16,9 +24,11 @@ Usage
 import argparse
 import json
 import os
+import subprocess
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 # Allow running as either `python -m wake_up_word.wake_server`
 # or `python wake_up_word/wake_server.py`.
@@ -26,6 +36,30 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 import wake_up  # noqa: E402
+
+APLAY_DEVICE = os.environ.get("APLAY_DEVICE")
+AUDIO_DIR = Path(_HERE).parent / "audio"
+_AUDIO_FILES = {
+    "prompt":    AUDIO_DIR / "prompt.wav",
+    "alerted":   AUDIO_DIR / "alerted.wav",
+    "cancelled": AUDIO_DIR / "cancelled.wav",
+}
+
+
+def _play_named(name: str) -> bool:
+    path = _AUDIO_FILES.get(name)
+    if path is None:
+        print(f"[audio] unknown name: {name!r}")
+        return False
+    if not path.exists():
+        print(f"[audio] missing file: {path}")
+        return False
+    cmd = ["aplay", "-q"]
+    if APLAY_DEVICE:
+        cmd += ["-D", APLAY_DEVICE]
+    cmd.append(str(path))
+    subprocess.run(cmd, check=False)
+    return True
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -46,6 +80,20 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(200, {"ok": True})
         else:
             self._send(404, {"error": "not found"})
+
+    def do_POST(self):  # noqa: N802
+        if self.path != "/play":
+            self._send(404, {"error": "not found"})
+            return
+        length = int(self.headers.get("Content-Length") or 0)
+        try:
+            body = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
+        except json.JSONDecodeError:
+            self._send(400, {"error": "invalid json"})
+            return
+        name = body.get("name", "")
+        ok = _play_named(name)
+        self._send(200 if ok else 400, {"played": ok, "name": name})
 
     def log_message(self, format, *args):
         # wake_up.main() already prints its own diagnostics; suppress per-request noise.
