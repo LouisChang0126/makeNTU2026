@@ -19,9 +19,9 @@ POLL_INTERVAL_S = 0.1
 HTTP_TIMEOUT_S = 10.0
 
 AUDIO_DIR = Path(__file__).parent / "audio"
-PROMPT_AUDIO = AUDIO_DIR / "prompt.wav"        # 偵測到您可能跌倒，您還好嗎？10 秒內回應否取消通知
-ALERTED_AUDIO = AUDIO_DIR / "alerted.wav"      # 已通知家人，請保持冷靜，等待協助
-CANCELLED_AUDIO = AUDIO_DIR / "cancelled.wav"  # 好的，已為您取消通知，注意安全
+PROMPT_AUDIO = AUDIO_DIR / "prompt.wav"        # 偵測到您可能跌倒，請問你還好嗎？請回應是否須取消通知
+ALERTED_AUDIO = AUDIO_DIR / "alerted.wav"      # 已通知您的家人，請保持冷靜，等待協助
+CANCELLED_AUDIO = AUDIO_DIR / "cancelled.wav"  # 好的，已為您取消通知，請注意安全
 
 
 def _play(path: Path) -> None:
