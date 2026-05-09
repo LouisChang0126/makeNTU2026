@@ -1,0 +1,47 @@
+# --- secrets / env ---
+.env
+.env.local
+.env.*.local
+*.env.yaml
+
+# --- python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg
+*.egg-info/
+build/
+dist/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- virtual envs ---
+.venv/
+venv/
+env/
+
+# --- IDE / editor ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- ngrok / tunnels ---
+ngrok.exe
+ngrok
+.ngrok2/
+
+# --- logs / runtime ---
+*.log
+*.pid
+
+# --- gcloud deploy artifacts ---
+.gcloudignore
