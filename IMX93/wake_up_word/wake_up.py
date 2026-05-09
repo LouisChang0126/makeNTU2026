@@ -11,7 +11,7 @@ wordlist = ["沒事", "取消", "救命", "啊", "unknown"]
 
 # 1. 載入模型路徑
 current_dir = os.path.dirname(os.path.abspath(__file__))
-model_file = os.path.join(current_dir, "x86_model.eim")
+model_file = os.path.join(current_dir, "model.eim")
 
 # --- 修改後的 Getter 函數 ---
 def getter():
