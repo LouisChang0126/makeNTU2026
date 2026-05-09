@@ -6,8 +6,8 @@ Polls the wake-word and pose-skeleton detectors. When either reports danger
 """
 import time
 
-from 喚醒詞 import getter as wake_getter
-from 骨架 import getter as pose_getter
+from wake_up_word.wake_up import getter as wake_getter
+# from 骨架 import getter as pose_getter
 
 from double_check import confirm
 
@@ -18,8 +18,8 @@ def main() -> None:
     while True:
         if wake_getter() == 1:
             confirm(event_type="help")
-        elif pose_getter() == 1:
-            confirm(event_type="fall")
+        # elif pose_getter() == 1:
+        #     confirm(event_type="fall")
         time.sleep(POLL_INTERVAL_S)
 
 

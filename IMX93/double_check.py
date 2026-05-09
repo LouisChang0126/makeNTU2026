@@ -11,7 +11,7 @@ import time
 import urllib.request
 from pathlib import Path
 
-from 喚醒詞 import getter as wake_getter
+from wake_up_word.wake_up import getter as wake_getter
 
 GCF_ENDPOINT = "https://makentu2026-linebot-129834734368.asia-east1.run.app/event"
 CANCEL_WINDOW_S = 10.0
