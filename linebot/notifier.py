@@ -19,7 +19,7 @@ from linebot.v3.messaging import (
     Configuration,
     ImageMessage,
     MessagingApi,
-    PushMessageRequest,
+    MulticastRequest,
     TextMessage,
 )
 
@@ -45,7 +45,7 @@ def trigger_event(event_type: str = "fall") -> dict:
     """
     ttl = config.stream_ttl_seconds()
     base = config.stream_public_base_url()
-    user_id = config.line_user_id()
+    user_ids = config.line_user_ids()
 
     token = _sign_token(ttl)
     stream_url = f"{base}/stream?token={token}"
@@ -62,9 +62,9 @@ def trigger_event(event_type: str = "fall") -> dict:
     cfg = Configuration(access_token=config.channel_access_token())
     with ApiClient(cfg) as client:
         api = MessagingApi(client)
-        api.push_message(
-            PushMessageRequest(
-                to=user_id,
+        api.multicast(
+            MulticastRequest(
+                to=user_ids,
                 messages=[
                     TextMessage(text=text),
                     ImageMessage(
@@ -80,4 +80,5 @@ def trigger_event(event_type: str = "fall") -> dict:
         "stream_url": stream_url,
         "snapshot_url": snapshot_url,
         "ttl_seconds": ttl,
+        "recipients": len(user_ids),
     }

@@ -10,8 +10,13 @@ def channel_access_token() -> str:
     return os.environ["LINE_CHANNEL_ACCESS_TOKEN"]
 
 
-def line_user_id() -> str:
-    return os.environ["LINE_USER_ID"]
+def line_user_ids() -> list[str]:
+    """Parse LINE_USER_ID as comma-separated list. Single id still works."""
+    raw = os.environ["LINE_USER_ID"]
+    ids = [s.strip() for s in raw.split(",") if s.strip()]
+    if not ids:
+        raise RuntimeError("LINE_USER_ID has no valid ids")
+    return ids
 
 
 def stream_signing_key() -> str:
