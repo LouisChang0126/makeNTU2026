@@ -47,18 +47,24 @@ def _post_event(event_type: str) -> None:
         resp.read()
 
 
-def confirm(event_type: str = "fall") -> None:
+# IMX93/double_check.py
+
+def confirm(event_type: str = "fall") -> bool: # 修改回傳型態為 bool
     _play(PROMPT_AUDIO)
 
     deadline = time.monotonic() + CANCEL_WINDOW_S
     while time.monotonic() < deadline:
         if wake_getter() == 2:
             _play(CANCELLED_AUDIO)
-            return
+            return False  # 使用者取消，回傳 False
         time.sleep(POLL_INTERVAL_S)
 
     try:
         _post_event(event_type)
+        _play(ALERTED_AUDIO)
+        return True   # 正式發出通知，回傳 True
     except Exception as e:
         print(f"[gcf] post failed: {e}")
-    _play(ALERTED_AUDIO)
+        return False  # 發送失敗，不進入冷卻
+    
+
