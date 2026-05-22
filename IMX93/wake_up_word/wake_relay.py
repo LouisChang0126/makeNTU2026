@@ -50,6 +50,12 @@ class _Handler(BaseHTTPRequestHandler):
                     r.status, r.read(),
                     r.headers.get("Content-Type", "application/json"),
                 )
+        except urllib.error.HTTPError as e:
+            # Pass upstream non-2xx through verbatim so diagnostic info survives.
+            self._send_raw(
+                e.code, e.read(),
+                e.headers.get("Content-Type", "application/json"),
+            )
         except (urllib.error.URLError, OSError) as e:
             # Fail closed with status=0 so an upstream outage cannot
             # silently cancel an alert (matches double_check semantics).
@@ -73,6 +79,11 @@ class _Handler(BaseHTTPRequestHandler):
                     r.status, r.read(),
                     r.headers.get("Content-Type", "application/json"),
                 )
+        except urllib.error.HTTPError as e:
+            self._send_raw(
+                e.code, e.read(),
+                e.headers.get("Content-Type", "application/json"),
+            )
         except (urllib.error.URLError, OSError) as e:
             self._send_err(503, str(e))
 

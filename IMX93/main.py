@@ -3,7 +3,7 @@ import sys
 import time
 from pathlib import Path
 
-from double_check import confirm
+from double_check import confirm, wake_getter
 
 # fall_getter 在開發板上位於 repo 外的 /root/fall_detection/imx93_version/
 _FALL_GETTER_DIR = (
@@ -24,10 +24,15 @@ def main() -> None:
 
     while True:
         fall_status = get_fall_status()
+        wake_status = wake_getter()  # 喊「救命/啊」回 1，喊「沒事/取消」回 2
         current_time = time.monotonic()
 
+        # 跌倒優先；沒跌倒但聽到求救也走 confirm 流程。
+        # wake_status==2 在這層忽略，那只在 confirm 的取消視窗裡才有意義。
         if fall_status == 1:
             triggered_event, label = "fall", "跌倒"
+        elif wake_status == 1:
+            triggered_event, label = "help", "求救"
         else:
             triggered_event = None
 
